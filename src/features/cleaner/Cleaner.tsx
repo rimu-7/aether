@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { CleanableItem } from "@/types/cleaner";
-import { Search, FolderSearch, Trash2, ArrowUpDown } from "lucide-react";
+import { Search, FolderSearch, ArrowUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";

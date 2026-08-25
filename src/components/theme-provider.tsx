@@ -1,7 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react"
-import { Store } from '@tauri-apps/plugin-store'
-
-const store = new Store('settings.json')
+import { load } from '@tauri-apps/plugin-store'
 
 type Theme = "dark" | "light" | "system"
 
@@ -30,10 +28,12 @@ export function ThemeProvider({
   const [theme, setTheme] = useState<Theme>(defaultTheme)
 
   useEffect(() => {
-    store.get<{ theme: Theme }>("theme").then((savedTheme) => {
-      if (savedTheme) {
-        setTheme(savedTheme as unknown as Theme)
-      }
+    load("settings.json").then(store => {
+      store.get<Theme>("theme").then((savedTheme: Theme | null | undefined) => {
+        if (savedTheme) {
+          setTheme(savedTheme)
+        }
+      })
     })
   }, [])
 
@@ -56,7 +56,9 @@ export function ThemeProvider({
   const value = {
     theme,
     setTheme: (theme: Theme) => {
-      store.set("theme", theme).then(() => store.save())
+      load("settings.json").then(store => {
+        store.set("theme", theme).then(() => store.save())
+      })
       setTheme(theme)
     },
   }
