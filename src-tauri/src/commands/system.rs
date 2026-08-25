@@ -1,9 +1,11 @@
 use crate::models::system::SystemInfo;
-use sysinfo::{System, Disks, Networks};
+use sysinfo::System;
+use std::sync::Arc;
+use crate::AppState;
 
 #[tauri::command]
-pub fn get_system_info() -> Result<SystemInfo, String> {
-    let mut sys = System::new_all();
+pub fn get_system_info(state: tauri::State<'_, Arc<AppState>>) -> Result<SystemInfo, String> {
+    let mut sys = state.sys.lock().map_err(|e| e.to_string())?;
     sys.refresh_all();
     
     let os_type = System::name().unwrap_or_else(|| "Unknown".to_string());
@@ -15,7 +17,8 @@ pub fn get_system_info() -> Result<SystemInfo, String> {
     let cpu_cores = sys.cpus().len();
     
     // Disks
-    let disks = Disks::new_with_refreshed_list();
+    let mut disks = state.disks.lock().map_err(|e| e.to_string())?;
+    disks.refresh(true);
     let mut disk_total = 0;
     let mut disk_free = 0;
     
@@ -35,7 +38,7 @@ pub fn get_system_info() -> Result<SystemInfo, String> {
     }
     
     // Networks
-    let networks = Networks::new_with_refreshed_list();
+    let networks = state.networks.lock().map_err(|e| e.to_string())?;
     let mut network_tx = 0;
     let mut network_rx = 0;
     for (_, network) in networks.iter() {
@@ -47,29 +50,35 @@ pub fn get_system_info() -> Result<SystemInfo, String> {
     let mut is_laptop = false;
     let mut battery_percentage = 0.0;
     
-    // starship/mac battery lookup via IOkit is tricky in rust without specific crates,
-    // but sysinfo actually doesn't have battery in System anymore, or it does?
-    // Wait, sysinfo has `sys.batteries()` but we need to check if it's available.
-    // Actually, `sysinfo` no longer provides batteries natively in the newer versions. It was moved or removed.
-    // Let's use macOS specific command `pmset -g batt` if needed, or just default to false for now,
-    // but wait! `battery` crate exists, but without it we can just call `pmset -g batt` via Command.
-    use std::process::Command;
-    let batt_output = Command::new("pmset")
-        .arg("-g")
-        .arg("batt")
-        .output();
-        
-    if let Ok(output) = batt_output {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        if stdout.contains("Battery") || stdout.contains("InternalBattery") {
-            is_laptop = true;
-            // Parse percentage: "100%;"
-            if let Some(pct_str) = stdout.split('%').next() {
-                if let Some(val_str) = pct_str.split_whitespace().last() {
-                    if let Ok(val) = val_str.parse::<f32>() {
-                        battery_percentage = val;
+    if cfg!(target_os = "macos") {
+        use std::process::Command;
+        if let Ok(output) = Command::new("pmset").arg("-g").arg("batt").output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if stdout.contains("Battery") || stdout.contains("InternalBattery") {
+                is_laptop = true;
+                if let Some(pct_str) = stdout.split('%').next() {
+                    if let Some(val_str) = pct_str.split_whitespace().last() {
+                        if let Ok(val) = val_str.parse::<f32>() {
+                            battery_percentage = val;
+                        }
                     }
                 }
+            }
+        }
+    } else if cfg!(target_os = "linux") {
+        if let Ok(capacity) = std::fs::read_to_string("/sys/class/power_supply/BAT0/capacity") {
+            is_laptop = true;
+            if let Ok(val) = capacity.trim().parse::<f32>() {
+                battery_percentage = val;
+            }
+        }
+    } else if cfg!(target_os = "windows") {
+        use std::process::Command;
+        if let Ok(output) = Command::new("powershell").args(&["-NoProfile", "-Command", "(Get-WmiObject Win32_Battery).EstimatedChargeRemaining"]).output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if let Ok(val) = stdout.trim().parse::<f32>() {
+                is_laptop = true;
+                battery_percentage = val;
             }
         }
     }

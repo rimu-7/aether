@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use sysinfo::{System, Networks, Disks};
 
 use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -13,6 +14,12 @@ pub mod services;
 #[derive(Debug, Clone)]
 pub struct MenubarState {
     pub enabled: bool,
+}
+
+pub struct AppState {
+    pub sys: Mutex<System>,
+    pub networks: Mutex<Networks>,
+    pub disks: Mutex<Disks>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -33,8 +40,14 @@ pub fn run() {
             // ============================================================
 
             let menubar_state = Arc::new(Mutex::new(MenubarState { enabled: false }));
-
             app.manage(menubar_state.clone());
+            
+            let app_state = Arc::new(AppState {
+                sys: Mutex::new(System::new_all()),
+                networks: Mutex::new(Networks::new_with_refreshed_list()),
+                disks: Mutex::new(Disks::new_with_refreshed_list()),
+            });
+            app.manage(app_state.clone());
 
             let tray = TrayIconBuilder::with_id("speed")
                 .title("↓ 0B ↑ 0B")
@@ -74,44 +87,33 @@ pub fn run() {
             // ============================================================
 
             let app_handle = app.handle().clone();
+            let state_clone = app_state.clone();
 
             tauri::async_runtime::spawn(async move {
-                use sysinfo::Networks;
-
                 println!("[Menubar] Network monitor started");
 
-                let mut networks = Networks::new_with_refreshed_list();
-
-                let mut last_rx: u64 = networks
-                    .iter()
-                    .map(|(_, network)| network.total_received())
-                    .sum();
-
-                let mut last_tx: u64 = networks
-                    .iter()
-                    .map(|(_, network)| network.total_transmitted())
-                    .sum();
+                let (mut last_rx, mut last_tx) = {
+                    let networks = state_clone.networks.lock().unwrap();
+                    let rx: u64 = networks.iter().map(|(_, network)| network.total_received()).sum();
+                    let tx: u64 = networks.iter().map(|(_, network)| network.total_transmitted()).sum();
+                    (rx, tx)
+                };
 
                 loop {
                     tokio::time::sleep(Duration::from_secs(1)).await;
 
-                    // Refresh network statistics.
-                    networks.refresh(true);
+                    let (current_rx, current_tx) = {
+                        let mut networks = match state_clone.networks.lock() {
+                            Ok(n) => n,
+                            Err(_) => continue,
+                        };
+                        networks.refresh(true);
+                        let rx: u64 = networks.iter().map(|(_, network)| network.total_received()).sum();
+                        let tx: u64 = networks.iter().map(|(_, network)| network.total_transmitted()).sum();
+                        (rx, tx)
+                    };
 
-                    let current_rx: u64 = networks
-                        .iter()
-                        .map(|(_, network)| network.total_received())
-                        .sum();
-
-                    let current_tx: u64 = networks
-                        .iter()
-                        .map(|(_, network)| network.total_transmitted())
-                        .sum();
-
-                    // Calculate bytes received/transmitted during
-                    // approximately the previous one-second interval.
                     let rx_speed = current_rx.saturating_sub(last_rx);
-
                     let tx_speed = current_tx.saturating_sub(last_tx);
 
                     last_rx = current_rx;

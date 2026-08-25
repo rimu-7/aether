@@ -21,12 +21,24 @@ fn get_dir_size(path: impl AsRef<Path>) -> u64 {
 
 pub fn scan_cleanable_items() -> Vec<CleanableItem> {
     let mut items = Vec::new();
-    
     if let Some(home_dir) = dirs::home_dir() {
-        let targets = vec![
-            (home_dir.join("Library/Caches"), "Cache"),
-            (home_dir.join("Library/Logs"), "Log"),
-        ];
+        let targets = if cfg!(target_os = "macos") {
+            vec![
+                (home_dir.join("Library/Caches"), "Cache"),
+                (home_dir.join("Library/Logs"), "Log"),
+            ]
+        } else if cfg!(target_os = "windows") {
+            vec![
+                (home_dir.join("AppData\\Local\\Temp"), "Cache"),
+                (home_dir.join("AppData\\Local\\Microsoft\\Windows\\INetCache"), "Cache"),
+            ]
+        } else {
+            // Linux
+            vec![
+                (home_dir.join(".cache"), "Cache"),
+                (home_dir.join(".local/share/Trash"), "Cache"),
+            ]
+        };
 
         for (target_dir, item_type) in targets {
             if !target_dir.exists() {
