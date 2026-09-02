@@ -7,6 +7,7 @@ import { UninstallPackageDialog } from "./UninstallPackageDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { detectPlatform } from "@/lib/utils";
 
 export function Packages() {
   const [packages, setPackages] = useState<Package[]>([]);
@@ -14,6 +15,8 @@ export function Packages() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "formulae" | "casks">("all");
+  
+  const platform = detectPlatform();
   
   const [selectedPkg, setSelectedPkg] = useState<Package | null>(null);
 
@@ -53,7 +56,7 @@ export function Packages() {
       <div className="flex items-center justify-between shrink-0">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Packages</h1>
-          <p className="text-muted-foreground">Manage your Homebrew formulae and casks.</p>
+          <p className="text-muted-foreground">Manage your installed system packages.</p>
         </div>
         <div className="flex gap-2">
           <div className="flex rounded-md border bg-muted p-1">
@@ -65,22 +68,45 @@ export function Packages() {
             >
               All
             </Button>
-            <Button 
-              variant={filter === "casks" ? "secondary" : "ghost"} 
-              size="sm" 
-              className="h-7 px-3 text-xs" 
-              onClick={() => setFilter("casks")}
-            >
-              Casks
-            </Button>
-            <Button 
-              variant={filter === "formulae" ? "secondary" : "ghost"} 
-              size="sm" 
-              className="h-7 px-3 text-xs" 
-              onClick={() => setFilter("formulae")}
-            >
-              Formulae
-            </Button>
+            {platform === "macos" ? (
+              <>
+                <Button 
+                  variant={filter === "casks" ? "secondary" : "ghost"} 
+                  size="sm" 
+                  className="h-7 px-3 text-xs" 
+                  onClick={() => setFilter("casks")}
+                >
+                  Casks
+                </Button>
+                <Button 
+                  variant={filter === "formulae" ? "secondary" : "ghost"} 
+                  size="sm" 
+                  className="h-7 px-3 text-xs" 
+                  onClick={() => setFilter("formulae")}
+                >
+                  Formulae
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button 
+                  variant={filter === "casks" ? "secondary" : "ghost"} 
+                  size="sm" 
+                  className="h-7 px-3 text-xs" 
+                  onClick={() => setFilter("casks")}
+                >
+                  Applications
+                </Button>
+                <Button 
+                  variant={filter === "formulae" ? "secondary" : "ghost"} 
+                  size="sm" 
+                  className="h-7 px-3 text-xs" 
+                  onClick={() => setFilter("formulae")}
+                >
+                  System
+                </Button>
+              </>
+            )}
           </div>
           <div className="w-64">
             <Input 
@@ -114,7 +140,7 @@ export function Packages() {
         ) : filteredPackages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <h3 className="text-lg font-medium">No packages found</h3>
-            <p className="text-muted-foreground mt-1">Make sure Homebrew is installed or try a different search.</p>
+            <p className="text-muted-foreground mt-1">No packages were found on this system.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-12">

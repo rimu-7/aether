@@ -9,6 +9,7 @@ use tauri::{
 
 pub mod commands;
 pub mod models;
+pub mod platform;
 pub mod services;
 
 #[derive(Debug, Clone)]
@@ -36,12 +37,12 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .setup(|app| {
             // ============================================================
-            // GLOBAL MENUBAR STATE
+            // GLOBAL MENUBAR / SPEED METER STATE
             // ============================================================
 
             let menubar_state = Arc::new(Mutex::new(MenubarState { enabled: false }));
             app.manage(menubar_state.clone());
-            
+
             let app_state = Arc::new(AppState {
                 sys: Mutex::new(System::new_all()),
                 networks: Mutex::new(Networks::new_with_refreshed_list()),
@@ -49,7 +50,11 @@ pub fn run() {
             });
             app.manage(app_state.clone());
 
-            let tray = TrayIconBuilder::with_id("speed")
+            // ============================================================
+            // TRAY ICON (Internet Speed Meter)
+            // ============================================================
+
+            let _tray = TrayIconBuilder::with_id("speed")
                 .title("↓ 0B ↑ 0B")
                 .show_menu_on_left_click(false)
                 .on_tray_icon_event(|tray, event| match event {
@@ -75,9 +80,17 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // Start visible for testing!
-            if let Err(error) = tray.set_visible(true) {
-                eprintln!("[Menubar] Failed to show initial tray: {:?}", error);
+            // On Linux, the tray may not be available without a system tray manager.
+            // Log the failure but don't crash; the speed meter still works in the dashboard.
+            if cfg!(target_os = "linux") {
+                if let Err(error) = _tray.set_visible(false) {
+                    eprintln!("[Menubar] Linux tray icon not available (no system tray?): {:?}", error);
+                    eprintln!("[Menubar] Speed meter will still work in the Dashboard.");
+                }
+            } else {
+                if let Err(error) = _tray.set_visible(false) {
+                    eprintln!("[Menubar] Failed to hide initial tray: {:?}", error);
+                }
             }
 
             println!("[Menubar] Tray initialized successfully");
@@ -122,10 +135,8 @@ pub fn run() {
                     // Read current state.
                     let enabled = match menubar_state.lock() {
                         Ok(state) => state.enabled,
-
                         Err(error) => {
                             eprintln!("[Menubar] Failed to lock state: {:?}", error);
-
                             continue;
                         }
                     };
@@ -138,7 +149,6 @@ pub fn run() {
                     // Find our tray item.
                     let Some(tray) = app_handle.tray_by_id("speed") else {
                         eprintln!("[Menubar] Tray 'speed' not found");
-
                         continue;
                     };
 
@@ -146,7 +156,13 @@ pub fn run() {
                         format!("↓ {} ↑ {}", format_speed(rx_speed), format_speed(tx_speed));
 
                     if let Err(error) = tray.set_title(Some(title.clone())) {
-                        eprintln!("[Menubar] Failed to update title: {:?}", error);
+                        // On some Linux tray implementations, set_title may not be supported.
+                        // This is non-fatal; the dashboard still works.
+                        if cfg!(target_os = "linux") {
+                            eprintln!("[Menubar] set_title not supported by this tray (Linux): {:?}", error);
+                        } else {
+                            eprintln!("[Menubar] Failed to update title: {:?}", error);
+                        }
                     }
                 }
             });
@@ -212,35 +228,31 @@ fn update_menubar_settings(
     println!("[Menubar] State updated successfully: enabled={}", enabled);
 
     // ------------------------------------------------------------
-    // Find tray
+    // Find tray and change visibility
     // ------------------------------------------------------------
-
-    let tray = match app.tray_by_id("speed") {
+    // On macOS and Windows, the tray is expected to be available.
+    // On Linux, the tray requires a system tray manager; if it's not
+    // available, we log a warning but still return Ok so the dashboard
+    // speed meter toggle works.
+    match app.tray_by_id("speed") {
         Some(tray) => {
-            println!("[Menubar] Tray 'speed' found");
-            tray
+            if let Err(error) = tray.set_visible(enabled) {
+                eprintln!("[Menubar] WARNING: Could not set tray visibility: {:?}", error);
+                if cfg!(target_os = "linux") {
+                    eprintln!("[Menubar] System tray may not be available on this Linux system.");
+                }
+            } else {
+                println!("[Menubar] Tray visibility successfully set to {}", enabled);
+            }
         }
-
         None => {
-            eprintln!("[Menubar] ERROR: Tray 'speed' does not exist");
-
-            return Err("Tray 'speed' was not found".to_string());
-        }
-    };
-
-    // ------------------------------------------------------------
-    // Change visibility
-    // ------------------------------------------------------------
-
-    match tray.set_visible(enabled) {
-        Ok(_) => {
-            println!("[Menubar] Tray visibility successfully set to {}", enabled);
-        }
-
-        Err(error) => {
-            eprintln!("[Menubar] ERROR setting tray visibility: {:?}", error);
-
-            return Err(format!("Failed to set tray visibility: {:?}", error));
+            if cfg!(target_os = "linux") {
+                eprintln!("[Menubar] System tray not available on this Linux system (no tray manager).");
+                println!("[Menubar] Speed meter state stored; dashboard will still show network speed.");
+            } else {
+                eprintln!("[Menubar] ERROR: Tray 'speed' does not exist");
+                return Err("Tray 'speed' was not found".to_string());
+            }
         }
     }
 

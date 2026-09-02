@@ -15,10 +15,10 @@ export function ApplicationCard({ app, onDeleteClick }: ApplicationCardProps) {
   const [iconFailed, setIconFailed] = useState(false);
 
   useEffect(() => {
-    invoke<string>("get_app_icon", { bundlePath: app.bundle_path })
+    invoke<string>("get_app_icon", { bundlePath: app.bundle_path, iconPath: app.icon_path })
       .then(setIconData)
       .catch(() => setIconFailed(true));
-  }, [app.bundle_path]);
+  }, [app.bundle_path, app.icon_path]);
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return "0 B";
@@ -33,7 +33,12 @@ export function ApplicationCard({ app, onDeleteClick }: ApplicationCardProps) {
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
           {iconData && !iconFailed ? (
-            <img src={iconData} alt={app.display_name} className="w-12 h-12 rounded-md object-contain select-none" />
+            <img 
+              src={iconData} 
+              alt={app.display_name} 
+              className="w-12 h-12 rounded-md object-contain select-none" 
+              onError={() => setIconFailed(true)}
+            />
           ) : (
             <div className="w-12 h-12 bg-muted rounded-md flex items-center justify-center text-xl font-bold text-muted-foreground select-none">
               {app.display_name.charAt(0)}

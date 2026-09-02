@@ -1,7 +1,8 @@
-import { Trash2, Terminal, AppWindow } from "lucide-react";
+import { Trash2, Terminal, AppWindow, Package as PackageIcon } from "lucide-react";
 import { Package } from "@/types/package";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { detectPlatform } from "@/lib/utils";
 
 interface PackageCardProps {
   pkg: Package;
@@ -9,6 +10,45 @@ interface PackageCardProps {
 }
 
 export function PackageCard({ pkg, onDeleteClick }: PackageCardProps) {
+  const platform = detectPlatform();
+
+  const getBadgeContent = () => {
+    if (pkg.is_cask) {
+      // Cask / GUI Application
+      if (platform === "macos") {
+        return (
+          <>
+            <AppWindow className="h-3 w-3" />
+            <span>Cask</span>
+          </>
+        );
+      }
+      return (
+        <>
+          <AppWindow className="h-3 w-3" />
+          <span>App</span>
+        </>
+      );
+    }
+
+    // Non-cask / system package
+    if (platform === "macos") {
+      return (
+        <>
+          <Terminal className="h-3 w-3" />
+          <span>Formula</span>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <PackageIcon className="h-3 w-3" />
+        <span>{platform === "linux" ? "Package" : "Program"}</span>
+      </>
+    );
+  };
+
   return (
     <div className="flex flex-col p-4 border rounded-xl bg-card text-card-foreground shadow-sm group">
       <div className="flex items-start justify-between">
@@ -44,11 +84,9 @@ export function PackageCard({ pkg, onDeleteClick }: PackageCardProps) {
       
       <div className="mt-auto pt-4 flex items-center justify-between">
         <div className="flex gap-2">
-          {pkg.is_cask ? (
-            <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-500 hover:bg-blue-500/20">Cask</Badge>
-          ) : (
-            <Badge variant="secondary" className="text-xs bg-orange-500/10 text-orange-500 hover:bg-orange-500/20">Formula</Badge>
-          )}
+          <Badge variant="secondary" className="text-xs flex items-center gap-1">
+            {getBadgeContent()}
+          </Badge>
         </div>
       </div>
     </div>

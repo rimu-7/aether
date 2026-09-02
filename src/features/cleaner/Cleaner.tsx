@@ -75,7 +75,7 @@ export function Cleaner() {
     try {
       await invoke("reveal_in_finder", { path });
     } catch (err) {
-      toast.error(`Failed to open Finder: ${err}`);
+      toast.error(`Failed to reveal file: ${err}`);
     }
   };
 
@@ -119,7 +119,7 @@ export function Cleaner() {
       <div className="flex items-center justify-between shrink-0">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Deep Cleaner</h1>
-          <p className="text-muted-foreground">Reclaim disk space by safely removing caches and logs.</p>
+          <p className="text-muted-foreground">Reclaim disk space by safely removing caches and temporary files.</p>
         </div>
         <div className="flex gap-2">
           <Button 
@@ -207,7 +207,7 @@ export function Cleaner() {
                     </Badge>
                   </div>
                   <div className="col-span-1 flex items-center justify-center">
-                    <Button variant="ghost" size="icon" onClick={() => handleReveal(item.absolute_path)} title="Reveal in Finder">
+                     <Button variant="ghost" size="icon" onClick={() => handleReveal(item.absolute_path)} title="Reveal in file manager">
                       <FolderSearch className="h-4 w-4 text-muted-foreground" />
                     </Button>
                   </div>

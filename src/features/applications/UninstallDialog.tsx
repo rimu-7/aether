@@ -37,7 +37,8 @@ export function UninstallDialog({ app, onOpenChange, onUninstallComplete }: Unin
     
     invoke<Artifact[]>("get_application_artifacts", { 
       bundleId: app.bundle_id, 
-      appName: app.name 
+      appName: app.name,
+      bundlePath: app.bundle_path,
     })
       .then((data) => {
         setArtifacts(data);
@@ -169,7 +170,7 @@ export function UninstallDialog({ app, onOpenChange, onUninstallComplete }: Unin
 
                 {artifacts.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-8">
-                    No related application data found on this Mac.
+                    No related application data found on this system.
                   </p>
                 )}
               </div>

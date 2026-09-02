@@ -66,15 +66,34 @@ pub fn get_system_info(state: tauri::State<'_, Arc<AppState>>) -> Result<SystemI
             }
         }
     } else if cfg!(target_os = "linux") {
-        if let Ok(capacity) = std::fs::read_to_string("/sys/class/power_supply/BAT0/capacity") {
-            is_laptop = true;
-            if let Ok(val) = capacity.trim().parse::<f32>() {
-                battery_percentage = val;
+        // Check for any battery device in /sys/class/power_supply/
+        if let Ok(entries) = std::fs::read_dir("/sys/class/power_supply") {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.starts_with("BAT") {
+                    if let Ok(capacity) = std::fs::read_to_string(entry.path().join("capacity")) {
+                        is_laptop = true;
+                        if let Ok(val) = capacity.trim().parse::<f32>() {
+                            battery_percentage = val;
+                        }
+                        break;
+                    }
+                }
             }
         }
     } else if cfg!(target_os = "windows") {
         use std::process::Command;
-        if let Ok(output) = Command::new("powershell").args(&["-NoProfile", "-Command", "(Get-WmiObject Win32_Battery).EstimatedChargeRemaining"]).output() {
+        // Use Get-CimInstance (modern replacement for Get-WmiObject)
+        if let Ok(output) = Command::new("powershell")
+            .args(&["-NoProfile", "-Command", r#"
+                $batteries = Get-CimInstance -ClassName Win32_Battery -ErrorAction SilentlyContinue
+                if ($batteries -ne $null) {
+                    $b = $batteries[0]
+                    Write-Output $b.EstimatedChargeRemaining
+                }
+            "#])
+            .output()
+        {
             let stdout = String::from_utf8_lossy(&output.stdout);
             if let Ok(val) = stdout.trim().parse::<f32>() {
                 is_laptop = true;

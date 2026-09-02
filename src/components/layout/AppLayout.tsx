@@ -16,7 +16,7 @@ import {
   AlignHorizontalSpaceAround,
 } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { cn, detectPlatform } from "@/lib/utils";
 import { useTheme } from "../theme-provider";
 
 const navItems = [
@@ -55,6 +55,8 @@ export function AppLayout() {
   const { theme, setTheme } = useTheme();
 
   const [menubarSpeed, setMenubarSpeed] = useState(false);
+  const platform = detectPlatform();
+  const trayLabel = platform === "macos" ? "menu bar" : "system tray";
 
   const [isLoadingMenubar, setIsLoadingMenubar] = useState(true);
 
@@ -298,9 +300,9 @@ export function AppLayout() {
               />
 
               <span className="text-xs text-muted-foreground">
-                {menubarSpeed
-                  ? "Showing network speed in menu bar"
-                  : "Hidden from menu bar"}
+              {menubarSpeed
+                ? `Showing network speed in ${trayLabel}`
+                : `Hidden from ${trayLabel}`}
               </span>
             </div>
 

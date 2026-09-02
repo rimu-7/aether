@@ -45,7 +45,7 @@ export function UninstallPackageDialog({ pkg, onOpenChange, onUninstallComplete 
         <DialogHeader>
           <DialogTitle>Uninstall {pkg?.name}</DialogTitle>
           <DialogDescription>
-            Are you sure you want to completely uninstall this {pkg?.is_cask ? 'application' : 'package'}? This action uses Homebrew and cannot be undone.
+            Are you sure you want to completely uninstall this {pkg?.is_cask ? 'application' : 'package'}? This action cannot be undone.
           </DialogDescription>
         </DialogHeader>
 

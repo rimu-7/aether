@@ -96,7 +96,7 @@ export function Files() {
       // Re-use cleaner reveal command
       await invoke("reveal_in_finder", { path });
     } catch (err) {
-      toast.error(`Failed to open Finder: ${err}`);
+      toast.error(`Failed to reveal file: ${err}`);
     }
   };
 
@@ -179,6 +179,14 @@ export function Files() {
               onClick={() => setCategoryFilter("Documents")}
             >
               Documents
+            </Button>
+            <Button 
+              variant={categoryFilter === "Desktop" ? "secondary" : "ghost"} 
+              size="sm" 
+              className="h-7 px-3 text-xs" 
+              onClick={() => setCategoryFilter("Desktop")}
+            >
+              Desktop
             </Button>
             <Button 
               variant={categoryFilter === "Movies" ? "secondary" : "ghost"} 
@@ -274,7 +282,7 @@ export function Files() {
                     </Badge>
                   </div>
                   <div className="col-span-1 flex items-center justify-center">
-                    <Button variant="ghost" size="icon" onClick={() => handleReveal(item.absolute_path)} title="Reveal in Finder">
+                     <Button variant="ghost" size="icon" onClick={() => handleReveal(item.absolute_path)} title="Reveal in file manager">
                       <FolderSearch className="h-4 w-4 text-muted-foreground" />
                     </Button>
                   </div>

@@ -51,7 +51,7 @@ export function Applications() {
       <div className="flex items-center justify-between shrink-0">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Applications</h1>
-          <p className="text-muted-foreground">Manage and uninstall applications from your Mac.</p>
+          <p className="text-muted-foreground">Manage and uninstall applications installed on your system.</p>
         </div>
         <div className="w-64">
           <Input 
