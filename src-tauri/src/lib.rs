@@ -96,13 +96,10 @@ pub fn run() {
             // On Linux, the tray may not be available without a system tray manager.
             // Log the failure but don't crash; the speed meter still works in the dashboard.
             if cfg!(target_os = "linux") {
-                if let Err(error) = _tray.set_visible(false) {
-                    eprintln!(
-                        "[Menubar] Linux tray icon not available (no system tray?): {:?}",
-                        error
-                    );
-                    eprintln!("[Menubar] Speed meter will still work in the Dashboard.");
-                }
+                // DO NOT call set_visible(false) initially on Linux.
+                // GNOME AppIndicator has a bug where transitioning from Passive (hidden) to Active (visible)
+                // often fails to render the icon. The frontend will hide it shortly after if disabled.
+                println!("[Menubar] Linux tray initialized. Not hiding initially due to AppIndicator bugs.");
             } else {
                 if let Err(error) = _tray.set_visible(false) {
                     eprintln!("[Menubar] Failed to hide initial tray: {:?}", error);
