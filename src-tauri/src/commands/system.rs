@@ -1,27 +1,31 @@
 use crate::models::system::SystemInfo;
-use sysinfo::System;
-use std::sync::Arc;
 use crate::AppState;
+use std::sync::Arc;
+use sysinfo::System;
 
 #[tauri::command]
 pub fn get_system_info(state: tauri::State<'_, Arc<AppState>>) -> Result<SystemInfo, String> {
     let mut sys = state.sys.lock().map_err(|e| e.to_string())?;
     sys.refresh_all();
-    
+
     let os_type = System::name().unwrap_or_else(|| "Unknown".to_string());
     let os_version = System::os_version().unwrap_or_else(|| "Unknown".to_string());
     let architecture = System::cpu_arch();
     let hostname = System::host_name().unwrap_or_else(|| "Unknown".to_string());
-    
-    let cpu_brand = sys.cpus().first().map(|cpu| cpu.brand().to_string()).unwrap_or_else(|| "Unknown".to_string());
+
+    let cpu_brand = sys
+        .cpus()
+        .first()
+        .map(|cpu| cpu.brand().to_string())
+        .unwrap_or_else(|| "Unknown".to_string());
     let cpu_cores = sys.cpus().len();
-    
+
     // Disks
     let mut disks = state.disks.lock().map_err(|e| e.to_string())?;
     disks.refresh(true);
     let mut disk_total = 0;
     let mut disk_free = 0;
-    
+
     // Find the primary system drive to avoid double-counting synthesized APFS/BTRFS volumes
     let root_path = if cfg!(target_os = "windows") {
         std::path::Path::new("C:\\")
@@ -36,7 +40,7 @@ pub fn get_system_info(state: tauri::State<'_, Arc<AppState>>) -> Result<SystemI
         disk_total = first_disk.total_space();
         disk_free = first_disk.available_space();
     }
-    
+
     // Networks
     let networks = state.networks.lock().map_err(|e| e.to_string())?;
     let mut network_tx = 0;
@@ -45,11 +49,11 @@ pub fn get_system_info(state: tauri::State<'_, Arc<AppState>>) -> Result<SystemI
         network_tx += network.total_transmitted();
         network_rx += network.total_received();
     }
-    
+
     // Battery
     let mut is_laptop = false;
     let mut battery_percentage = 0.0;
-    
+
     if cfg!(target_os = "macos") {
         use std::process::Command;
         if let Ok(output) = Command::new("pmset").arg("-g").arg("batt").output() {
@@ -82,16 +86,19 @@ pub fn get_system_info(state: tauri::State<'_, Arc<AppState>>) -> Result<SystemI
             }
         }
     } else if cfg!(target_os = "windows") {
-        use std::process::Command;
+        use crate::platform::utils::background_powershell_command;
         // Use Get-CimInstance (modern replacement for Get-WmiObject)
-        if let Ok(output) = Command::new("powershell")
-            .args(&["-NoProfile", "-Command", r#"
+        if let Ok(output) = background_powershell_command()
+            .args([
+                "-Command",
+                r#"
                 $batteries = Get-CimInstance -ClassName Win32_Battery -ErrorAction SilentlyContinue
                 if ($batteries -ne $null) {
                     $b = $batteries[0]
                     Write-Output $b.EstimatedChargeRemaining
                 }
-            "#])
+            "#,
+            ])
             .output()
         {
             let stdout = String::from_utf8_lossy(&output.stdout);
@@ -101,7 +108,7 @@ pub fn get_system_info(state: tauri::State<'_, Arc<AppState>>) -> Result<SystemI
             }
         }
     }
-    
+
     Ok(SystemInfo {
         os_type,
         os_version,

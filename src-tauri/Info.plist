@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSDesktopFolderUsageDescription</key>
+  <string>Aether needs access to Desktop so you can find, review, and move selected large files to Trash.</string>
+  <key>NSDocumentsFolderUsageDescription</key>
+  <string>Aether needs access to Documents so you can find, review, and move selected large files to Trash.</string>
+  <key>NSDownloadsFolderUsageDescription</key>
+  <string>Aether needs access to Downloads so you can find, review, and move selected large files to Trash.</string>
+  <key>NSRemovableVolumesUsageDescription</key>
+  <string>Aether needs access to removable volumes only when you choose to scan files stored there.</string>
+  <key>NSNetworkVolumesUsageDescription</key>
+  <string>Aether needs access to network volumes only when you choose to scan files stored there.</string>
+</dict>
+</plist>

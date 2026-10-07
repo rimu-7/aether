@@ -2,20 +2,21 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Package } from "@/types/package";
 
 interface UninstallPackageDialogProps {
   pkg: Package | null;
   onOpenChange: (open: boolean) => void;
-  onUninstallComplete: () => void;
+  onUninstallComplete: (pkg: Package) => void;
 }
 
 export function UninstallPackageDialog({ pkg, onOpenChange, onUninstallComplete }: UninstallPackageDialogProps) {
@@ -26,9 +27,13 @@ export function UninstallPackageDialog({ pkg, onOpenChange, onUninstallComplete 
     
     setDeleting(true);
     try {
-      await invoke("uninstall_package", { id: pkg.id, isCask: pkg.is_cask });
+      await invoke("uninstall_package", {
+        id: pkg.id,
+        isCask: pkg.is_cask,
+        manager: pkg.manager,
+      });
       toast.success(`${pkg.name} uninstalled successfully.`);
-      onUninstallComplete();
+      onUninstallComplete(pkg);
       onOpenChange(false);
     } catch (err) {
       toast.error(`Failed to uninstall: ${err}`);
@@ -38,26 +43,26 @@ export function UninstallPackageDialog({ pkg, onOpenChange, onUninstallComplete 
   };
 
   return (
-    <Dialog open={!!pkg} onOpenChange={(open) => {
+    <AlertDialog open={!!pkg} onOpenChange={(open) => {
       if (!deleting) onOpenChange(open);
     }}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Uninstall {pkg?.name}</DialogTitle>
-          <DialogDescription>
+      <AlertDialogContent className="sm:max-w-[425px]">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Uninstall {pkg?.name}</AlertDialogTitle>
+          <AlertDialogDescription>
             Are you sure you want to completely uninstall this {pkg?.is_cask ? 'application' : 'package'}? This action cannot be undone.
-          </DialogDescription>
-        </DialogHeader>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
 
-        <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={deleting}>
+        <AlertDialogFooter className="mt-4">
+          <AlertDialogCancel disabled={deleting}>
             Cancel
-          </Button>
-          <Button variant="destructive" onClick={handleUninstall} disabled={deleting}>
+          </AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={handleUninstall} disabled={deleting}>
             {deleting ? "Uninstalling..." : "Uninstall"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

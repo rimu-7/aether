@@ -1,6 +1,7 @@
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use sysinfo::{System, Networks, Disks};
+use sysinfo::{Disks, Networks, System};
 
 use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -21,6 +22,10 @@ pub struct AppState {
     pub sys: Mutex<System>,
     pub networks: Mutex<Networks>,
     pub disks: Mutex<Disks>,
+    /// Additional user-selected roots for the current Files session. They are
+    /// registered only after the native folder picker has been used and are
+    /// also the only extra roots accepted by the deletion safety check.
+    pub selected_file_roots: Mutex<Vec<PathBuf>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -47,6 +52,7 @@ pub fn run() {
                 sys: Mutex::new(System::new_all()),
                 networks: Mutex::new(Networks::new_with_refreshed_list()),
                 disks: Mutex::new(Disks::new_with_refreshed_list()),
+                selected_file_roots: Mutex::new(Vec::new()),
             });
             app.manage(app_state.clone());
 
@@ -84,7 +90,10 @@ pub fn run() {
             // Log the failure but don't crash; the speed meter still works in the dashboard.
             if cfg!(target_os = "linux") {
                 if let Err(error) = _tray.set_visible(false) {
-                    eprintln!("[Menubar] Linux tray icon not available (no system tray?): {:?}", error);
+                    eprintln!(
+                        "[Menubar] Linux tray icon not available (no system tray?): {:?}",
+                        error
+                    );
                     eprintln!("[Menubar] Speed meter will still work in the Dashboard.");
                 }
             } else {
@@ -107,8 +116,14 @@ pub fn run() {
 
                 let (mut last_rx, mut last_tx) = {
                     let networks = state_clone.networks.lock().unwrap();
-                    let rx: u64 = networks.iter().map(|(_, network)| network.total_received()).sum();
-                    let tx: u64 = networks.iter().map(|(_, network)| network.total_transmitted()).sum();
+                    let rx: u64 = networks
+                        .iter()
+                        .map(|(_, network)| network.total_received())
+                        .sum();
+                    let tx: u64 = networks
+                        .iter()
+                        .map(|(_, network)| network.total_transmitted())
+                        .sum();
                     (rx, tx)
                 };
 
@@ -121,8 +136,14 @@ pub fn run() {
                             Err(_) => continue,
                         };
                         networks.refresh(true);
-                        let rx: u64 = networks.iter().map(|(_, network)| network.total_received()).sum();
-                        let tx: u64 = networks.iter().map(|(_, network)| network.total_transmitted()).sum();
+                        let rx: u64 = networks
+                            .iter()
+                            .map(|(_, network)| network.total_received())
+                            .sum();
+                        let tx: u64 = networks
+                            .iter()
+                            .map(|(_, network)| network.total_transmitted())
+                            .sum();
                         (rx, tx)
                     };
 
@@ -159,7 +180,10 @@ pub fn run() {
                         // On some Linux tray implementations, set_title may not be supported.
                         // This is non-fatal; the dashboard still works.
                         if cfg!(target_os = "linux") {
-                            eprintln!("[Menubar] set_title not supported by this tray (Linux): {:?}", error);
+                            eprintln!(
+                                "[Menubar] set_title not supported by this tray (Linux): {:?}",
+                                error
+                            );
                         } else {
                             eprintln!("[Menubar] Failed to update title: {:?}", error);
                         }
@@ -237,7 +261,10 @@ fn update_menubar_settings(
     match app.tray_by_id("speed") {
         Some(tray) => {
             if let Err(error) = tray.set_visible(enabled) {
-                eprintln!("[Menubar] WARNING: Could not set tray visibility: {:?}", error);
+                eprintln!(
+                    "[Menubar] WARNING: Could not set tray visibility: {:?}",
+                    error
+                );
                 if cfg!(target_os = "linux") {
                     eprintln!("[Menubar] System tray may not be available on this Linux system.");
                 }
@@ -247,8 +274,12 @@ fn update_menubar_settings(
         }
         None => {
             if cfg!(target_os = "linux") {
-                eprintln!("[Menubar] System tray not available on this Linux system (no tray manager).");
-                println!("[Menubar] Speed meter state stored; dashboard will still show network speed.");
+                eprintln!(
+                    "[Menubar] System tray not available on this Linux system (no tray manager)."
+                );
+                println!(
+                    "[Menubar] Speed meter state stored; dashboard will still show network speed."
+                );
             } else {
                 eprintln!("[Menubar] ERROR: Tray 'speed' does not exist");
                 return Err("Tray 'speed' was not found".to_string());

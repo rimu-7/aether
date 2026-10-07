@@ -14,21 +14,40 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Application, Artifact } from "@/types/application";
+import { DeletionResult } from "@/types/deletion";
+import { detectPlatform } from "@/lib/utils";
 
 interface UninstallDialogProps {
   app: Application | null;
   onOpenChange: (open: boolean) => void;
-  onUninstallComplete: () => void;
+  onUninstallComplete: (app: Application) => void;
 }
 
 export function UninstallDialog({ app, onOpenChange, onUninstallComplete }: UninstallDialogProps) {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
+  const isWindowsRegistryApp = Boolean(
+    app
+      && detectPlatform() === "windows"
+      && /^(HKLM64|HKLM32|HKCU):/.test(app.id)
+  );
 
   useEffect(() => {
+    setConfirmOpen(false);
     if (!app) return;
     
     setLoading(true);
@@ -78,15 +97,39 @@ export function UninstallDialog({ app, onOpenChange, onUninstallComplete }: Unin
     setDeleting(true);
     try {
       const pathsToDelete = Array.from(selectedPaths);
-      const deleted: string[] = await invoke("delete_artifacts", { paths: pathsToDelete });
+      const shouldRunWindowsUninstaller = isWindowsRegistryApp && selectedPaths.has(app.bundle_path);
+      if (shouldRunWindowsUninstaller) {
+        await invoke("uninstall_package", {
+          id: app.id,
+          isCask: true,
+          manager: "windows-registry",
+        });
+      }
+
+      // The Windows installer owns its Program Files folder; do not try to
+      // move that folder separately after its native uninstaller has run.
+      const artifactPaths = shouldRunWindowsUninstaller
+        ? pathsToDelete.filter((path) => path !== app.bundle_path)
+        : pathsToDelete;
+      const result: DeletionResult = artifactPaths.length > 0
+        ? await invoke("delete_artifacts", { paths: artifactPaths })
+        : { deleted: [], failures: [] };
+      const applicationWasRemoved = shouldRunWindowsUninstaller || result.deleted.includes(app.bundle_path);
       
-      if (deleted.length < pathsToDelete.length) {
-        toast.warning(`Uninstalled with warnings. Removed ${deleted.length} of ${pathsToDelete.length} items.`);
+      if (result.failures.length > 0) {
+        toast.warning(`Moved ${result.deleted.length} of ${pathsToDelete.length} selected items to Trash. ${result.failures.length} could not be moved.`);
+      } else if (shouldRunWindowsUninstaller) {
+        toast.success(`${app.display_name} was uninstalled. Selected leftover data was moved to Trash.`);
+      } else if (applicationWasRemoved) {
+        toast.success(`Moved ${app.display_name} and its selected data to Trash.`);
       } else {
-        toast.success(`${app.display_name} uninstalled successfully.`);
+        toast.success("Moved selected application data to Trash.");
       }
       
-      onUninstallComplete();
+      setConfirmOpen(false);
+      if (applicationWasRemoved) {
+        onUninstallComplete(app);
+      }
       onOpenChange(false);
     } catch (err) {
       toast.error(`Failed to uninstall: ${err}`);
@@ -103,12 +146,21 @@ export function UninstallDialog({ app, onOpenChange, onUninstallComplete }: Unin
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  const totalSelectedSize = app?.bundle_path && selectedPaths.has(app.bundle_path) ? app.size_bytes : 0 
-    + artifacts.filter(a => selectedPaths.has(a.path)).reduce((sum, a) => sum + a.size_bytes, 0);
+  const selectedApplicationSize = app && selectedPaths.has(app.bundle_path) ? app.size_bytes : 0;
+  const selectedArtifactSize = artifacts
+    .filter(a => selectedPaths.has(a.path))
+    .reduce((sum, a) => sum + a.size_bytes, 0);
+  const totalSelectedSize = selectedApplicationSize + selectedArtifactSize;
 
   return (
-    <Dialog open={!!app} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col">
+    <>
+      <Dialog open={!!app} onOpenChange={(open) => {
+        if (!deleting && !confirmOpen) onOpenChange(open);
+      }}>
+      <DialogContent
+        className="sm:max-w-[600px] max-h-[85vh] flex flex-col"
+        showCloseButton={!deleting && !confirmOpen}
+      >
         <DialogHeader>
           <DialogTitle>Uninstall {app?.display_name}</DialogTitle>
           <DialogDescription>
@@ -184,14 +236,44 @@ export function UninstallDialog({ app, onOpenChange, onUninstallComplete }: Unin
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={deleting}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={deleting || confirmOpen}>
             Cancel
           </Button>
-          <Button variant="destructive" onClick={handleUninstall} disabled={deleting || selectedPaths.size === 0 || loading}>
-            {deleting ? "Uninstalling..." : "Uninstall Selected"}
+          <Button
+            variant="destructive"
+            onClick={() => setConfirmOpen(true)}
+            disabled={deleting || selectedPaths.size === 0 || loading}
+          >
+            Uninstall Selected
           </Button>
         </DialogFooter>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+
+      <AlertDialog open={confirmOpen} onOpenChange={(open) => {
+        if (!deleting) setConfirmOpen(open);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete selected application data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isWindowsRegistryApp && selectedPaths.has(app?.bundle_path || "")
+                ? `Windows will run this application's registered uninstaller${selectedPaths.size > 1 ? " and move selected leftover data to Trash" : ""}.`
+                : `This will move ${selectedPaths.size} selected ${selectedPaths.size === 1 ? "item" : "items"} (${formatBytes(totalSelectedSize)}) to your system Trash.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deleting || selectedPaths.size === 0}
+              onClick={handleUninstall}
+            >
+              {deleting ? "Uninstalling..." : isWindowsRegistryApp && selectedPaths.has(app?.bundle_path || "") ? "Uninstall application" : "Move selected items to Trash"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

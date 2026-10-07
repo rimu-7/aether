@@ -12,6 +12,13 @@ interface PackageCardProps {
 export function PackageCard({ pkg, onDeleteClick }: PackageCardProps) {
   const platform = detectPlatform();
 
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return "Size unavailable";
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    return `${(bytes / Math.pow(1024, index)).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+  };
+
   const getBadgeContent = () => {
     if (pkg.is_cask) {
       // Cask / GUI Application
@@ -83,11 +90,17 @@ export function PackageCard({ pkg, onDeleteClick }: PackageCardProps) {
       )}
       
       <div className="mt-auto pt-4 flex items-center justify-between">
-        <div className="flex gap-2">
+        <div className="flex gap-2 min-w-0">
           <Badge variant="secondary" className="text-xs flex items-center gap-1">
             {getBadgeContent()}
           </Badge>
+          <Badge variant="outline" className="text-xs truncate max-w-28" title={pkg.manager}>
+            {pkg.manager}
+          </Badge>
         </div>
+        <span className="text-xs text-muted-foreground ml-2 shrink-0" title={pkg.size_bytes > 0 ? "Installed size reported by the package source" : "This package source does not report an installed size"}>
+          {formatBytes(pkg.size_bytes)}
+        </span>
       </div>
     </div>
   );

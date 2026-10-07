@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { cn, detectPlatform } from "@/lib/utils";
+import { useScanStore } from "@/stores/scanStore";
 import { useTheme } from "../theme-provider";
 
 const navItems = [
@@ -53,6 +54,7 @@ type MenubarSettings = {
 
 export function AppLayout() {
   const { theme, setTheme } = useTheme();
+  const ensureScansLoaded = useScanStore((state) => state.ensureScansLoaded);
 
   const [menubarSpeed, setMenubarSpeed] = useState(false);
   const platform = detectPlatform();
@@ -61,6 +63,13 @@ export function AppLayout() {
   const [isLoadingMenubar, setIsLoadingMenubar] = useState(true);
 
   const [menubarError, setMenubarError] = useState<string | null>(null);
+
+  // Begin the slower disk scans as soon as the app shell exists. The shared
+  // store keeps their results alive while routes change, so opening Cleaner or
+  // Files does not start another scan.
+  useEffect(() => {
+    void ensureScansLoaded();
+  }, [ensureScansLoaded]);
 
   // ============================================================
   // LOAD SETTINGS

@@ -4,4 +4,6 @@ export interface Package {
   description?: string;
   version: string;
   is_cask: boolean;
+  manager: string;
+  size_bytes: number;
 }

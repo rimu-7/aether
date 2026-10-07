@@ -45,3 +45,8 @@ image = { version = "0.25.10", default-features = false, features = ["png", "ico
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 image = { version = "0.25.10", default-features = false, features = ["png", "ico", "bmp"] }
 
+[target.'cfg(target_os = "windows")'.dependencies]
+# Read the installed-program registry directly.  This avoids spawning a visible
+# PowerShell process from the GUI application for every scan (and, previously,
+# for every application icon).
+winreg = "0.55"
