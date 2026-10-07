@@ -60,9 +60,16 @@ pub fn run() {
             // TRAY ICON (Internet Speed Meter)
             // ============================================================
 
-            let _tray = TrayIconBuilder::with_id("speed")
+            let mut builder = TrayIconBuilder::with_id("speed")
                 .title("↓ 0B ↑ 0B")
-                .show_menu_on_left_click(false)
+                .show_menu_on_left_click(false);
+
+            #[cfg(target_os = "linux")]
+            if let Some(icon) = app.default_window_icon() {
+                builder = builder.icon(icon.clone());
+            }
+
+            let _tray = builder
                 .on_tray_icon_event(|tray, event| match event {
                     TrayIconEvent::Click {
                         button: MouseButton::Left,

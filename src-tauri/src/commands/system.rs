@@ -4,9 +4,12 @@ use std::sync::Arc;
 use sysinfo::System;
 
 #[tauri::command]
-pub fn get_system_info(state: tauri::State<'_, Arc<AppState>>) -> Result<SystemInfo, String> {
+pub async fn get_system_info(state: tauri::State<'_, Arc<AppState>>) -> Result<SystemInfo, String> {
     let mut sys = state.sys.lock().map_err(|e| e.to_string())?;
-    sys.refresh_all();
+    // sys.refresh_all() is too slow to run every second. Only refresh what's needed.
+    sys.refresh_cpu_usage();
+    sys.refresh_memory();
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
     let os_type = System::name().unwrap_or_else(|| "Unknown".to_string());
     let os_version = System::os_version().unwrap_or_else(|| "Unknown".to_string());

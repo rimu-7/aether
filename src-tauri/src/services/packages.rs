@@ -661,7 +661,7 @@ fn uninstall_linux_package(id: &str, manager: Option<&str>) -> Result<(), String
 
     let (program, args): (&str, Vec<&str>) = match manager {
         "dnf" => ("pkexec", vec!["dnf", "remove", "-y", name]),
-        "apt" => ("pkexec", vec!["apt-get", "remove", "-y", name]),
+        "apt" => ("pkexec", vec!["env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "remove", "-y", name]),
         "pacman" => ("pkexec", vec!["pacman", "-R", "--noconfirm", name]),
         "zypper" => (
             "pkexec",
@@ -671,6 +671,7 @@ fn uninstall_linux_package(id: &str, manager: Option<&str>) -> Result<(), String
         "xbps" => ("pkexec", vec!["xbps-remove", "-y", name]),
         "flatpak" => ("flatpak", vec!["uninstall", "--noninteractive", "-y", name]),
         "snap" => ("pkexec", vec!["snap", "remove", name]),
+        "homebrew" => ("brew", vec!["uninstall", name]),
         _ => return Err(format!("Unsupported package source: {manager}")),
     };
 
